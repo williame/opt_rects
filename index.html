@@ -12,7 +12,7 @@ html, body { border:0px;margin:0px;padding:0px; color:white; background-color:bl
 <script type="text/javascript" src="ui.js"></script>
 <script type="text/javascript">
 
-var gl, canvas, quadtree, ctx, colours;
+var gl, canvas, sprites, colours, quadTree, ctx, useQuadTree = true;
 
 function sortByZ(a,b) { return a.z-b.z; }
 
@@ -21,12 +21,16 @@ function sortByColour(a,b) { return a.colour-b.colour; }
 var sortFunc = sortByZ; //### can be changed to sortByColour with C key
 
 // call this function to draw all the sprites to the appropriate context
-function draw(visibleRect,quadtree,ctx) {
+function draw(visibleRect,quadTree,ctx) {
 	var t = now();
 	// get the sprites that are visible
-	var sprites = [];
-	quadtree.find(visibleRect,sprites);
-	sprites.sort(sortFunc);
+	if(useQuadTree) {
+		var sprites = [];
+		quadTree.find(visibleRect,sprites);
+		if(sortFunc)
+			sprites.sort(sortFunc);
+	} else
+		sprites = window.sprites; // draw them all
 	// and draw them
 	ctx.clear();
 	for(var sprite in sprites) {
@@ -40,8 +44,26 @@ function draw(visibleRect,quadtree,ctx) {
 	}
 	ctx.finish();
 	if(drew)
-		console.log(""+sortFunc.name,sprites.length,ctx.buffers.length,drew,t-lastDraw,1000/((t-lastDraw)/drew));
+		console.log(sortFunc?sortFunc.name:"(no sort)",
+			"# visible sprites =",sprites.length,
+			"# state changes = ",ctx.buffers.length,
+			"fps = ",1000/((t-lastDraw)/drew));
 	lastDraw = t;
+}
+
+function setSortFunc(func) {
+	if(func == sortFunc) {
+		sprites.reverse();
+	} else {
+		sortFunc = func;
+		if(sortFunc)
+			sprites.sort(sortFunc).reverse();
+	}
+	if(useQuadTree)
+		quadTree = make_tree(sprites,function(sprite) { return sprite.rect; });
+	else
+		quadTree = null;
+	visibleRect = null;
 }
 
 function start() {
@@ -79,7 +101,7 @@ function start() {
 			tex:  createTexture(w,h,tex),
 		});
 	}
-	var sprites = [];
+	sprites = [];
 	for(var i=0; i<10000; i++) { // we have 10K rectangles
 		var	x = Math.random()*10000,
 			y = Math.random()*10000,
@@ -93,16 +115,19 @@ function start() {
 			z: i,
 		});
 	}
-	
-	// for this example, we'll put the sprites into a crude, static quadtree
-	quadtree = make_tree(sprites,function(sprite) { return sprite.rect; });
+	setSortFunc(sortByZ);
 	
 	document.addEventListener("keyup",function(evt) {
-		if(evt.which == 67 || evt.which == 99) // C
-			sortFunc = sortByColour;
-		else if(evt.which == 90 || evt.which == 122) // Z
-			sortFunc = sortByZ;
-		visibleRect = null;
+		if(evt.which == 67 || evt.which == 99) { // C
+			setSortFunc(sortByColour);
+		} else if(evt.which == 90 || evt.which == 122) { // Z
+			setSortFunc(sortByZ);
+		} else if(evt.which == 88 || evt.which == 120) { // X
+			setSortFunc(null);
+		} else if(evt.which == 89 || evt.which == 121) { // Y
+			useQuadTree = !useQuadTree;
+			visibleRect = null;
+		}
 	},true);
 
 	// ready to go
@@ -136,7 +161,7 @@ function loop() {
 	var screenRect = [winOfs[0],winOfs[1],winOfs[0]+canvas.width,winOfs[1]+canvas.height];
 	if(!visibleRect || !aabb_contains(visibleRect,screenRect)) {
 		visibleRect = [screenRect[0]-STEPS_PER_DRAW,screenRect[1]-STEPS_PER_DRAW,screenRect[2]+STEPS_PER_DRAW,screenRect[3]+STEPS_PER_DRAW];
-		draw(visibleRect,quadtree,ctx);
+		draw(visibleRect,quadTree,ctx);
 		drew = 0;
 	}
 	ctx.draw(createOrtho2D(screenRect[0],screenRect[2],screenRect[1],screenRect[3],-100,800));
@@ -158,7 +183,7 @@ window.requestAnimFrame =
 <h1>This is a simple test app to find a sane to draw a complex scene</h1>
 <div>Please see <a href="http://stackoverflow.com/questions/14315104/optimising-the-drawing-of-overlapping-rectangles">
 http://stackoverflow.com/questions/14315104/optimising-the-drawing-of-overlapping-rectangles</a> for the question with a <b>+500</b> bounty!<br/>
-(use <b>C</b> to sort-by-colour and <b>Z</b> to sort-by-Z)</div>
+(use <b>C</b> to sort-by-colour and <b>Z</b> to sort-by-Z, <b>X</b> to not sort before draw, <b>Y</b> to not use a quad-tree and press the key again to reverse the data submitted to the quadTree)</div>
 <noscript>
 Sorry, you don't have Javascript enabled :(<br/>
 </noscript>
