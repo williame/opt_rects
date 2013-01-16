@@ -1,0 +1,132 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>http://stackoverflow.com/questions/14315104/optimising-the-drawing-of-overlapping-rectangles</title>
+<style type="text/css">
+html, body { border:0px;margin:0px;padding:0px; color:white; background-color:black;}
+#game-canvas { width:100%; border:0px;margin:0px;padding:0px; }
+</style>
+<script type="text/javascript" src="collisions.js"></script>
+<script type="text/javascript" src="glutil.js"></script>
+<script type="text/javascript" src="ui.js"></script>
+<script type="text/javascript">
+
+var gl, canvas, octree, ctx;
+
+// call this function to draw all the sprites to the appropriate context
+function draw(visibleRect,octree,ctx) {
+	// get the sprites that are visible
+	var sprites = [];
+	octree.find(visibleRect,sprites);
+	sprites.sort(function(a,b) { return a.z-b.z; }); // sort by z
+	// and draw them
+	ctx.clear();
+	for(var sprite in sprites) {
+		sprite = sprites[sprite];
+		var rect = sprite.rect;
+		ctx.fillRect(sprite.colour,rect[0],rect[1],rect[2],rect[3]);
+	}
+	ctx.finish();
+}
+
+function start() {
+
+	// create the test data
+	var colours = [];
+	for(var i=0; i<100; i++) // from a palette of 100 colours
+		colours.push([Math.random(),Math.random(),Math.random(),Math.max(0.3,Math.random())]);
+	var sprites = [];
+	for(var i=0; i<10000; i++) { // we have 10K rectangles
+		var	x = Math.random()*10000,
+			y = Math.random()*10000,
+			w = Math.random()*100,
+			h = Math.random()*100,
+			colour = colours[Math.floor(Math.random()*colours.length)];
+		sprites.push({
+			rect: [x,y,x+w,y+h],
+			colour: colour,
+			z: i,
+		});
+	}
+	
+	// for this example, we'll put the sprites into a crude, static octree
+	octree = make_tree(sprites,function(sprite) { return sprite.rect; });
+
+	// create the opengl context
+	canvas = document.getElementById("game-canvas");
+	try {
+		gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+	} catch(e) {
+		console.log("Error initializing webGL:",e);
+	}
+	if(!gl) {
+		console.log(gl);
+		alert("Unable to initialize WebGL. Your browser may not support it.");
+		return;
+	}
+	glInit();
+  	window.onresize = function() {
+  		canvas.style.height = (window.innerHeight - canvas.offsetTop)+"px";
+		canvas.width = canvas.offsetWidth;
+		canvas.height = canvas.offsetHeight;
+		gl.viewport(0,0,canvas.offsetWidth,canvas.offsetHeight);
+		visibleRect = null;
+	};
+	window.onresize();
+
+	// ready to go
+	ctx = new UIContext();
+	requestAnimFrame(loop);
+}
+
+function assert(condition,msg) {
+	if(!condition) throw new Error(msg||"an error occurred");
+}
+
+var	winOfs = [0,0],
+	visibleRect,
+	move = vec2_normalise([Math.max(0.2,Math.random()),Math.max(0.2,Math.random())]); // 1 pixel per redraw loop
+
+function loop() {
+	window.requestAnimFrame(loop);
+	// move the camera around, bouncing off edges
+	if(winOfs[0] + move[0] < 0 || winOfs[0] + move[0] > canvas.width)
+		move[0] = -move[0];
+	winOfs[0] += move[0];
+	if(winOfs[1] + move[1] < 0 || winOfs[1] + move[1] > canvas.height)
+		move[1] = -move[1];
+	winOfs[1] += move[1];
+	// has visibility changed? work out what to draw
+	var screenRect = [winOfs[0],winOfs[1],winOfs[0]+canvas.width,winOfs[1]+canvas.height];
+	if(!visibleRect || !aabb_contains(visibleRect,screenRect)) {
+		var FRINGE = 10; // if we add a border to our visibleRect, we don't have to update it every n frames
+		visibleRect = [screenRect[0]-FRINGE,screenRect[1]-FRINGE,screenRect[2]-FRINGE,screenRect[3]-FRINGE];
+		draw(visibleRect,octree,ctx);
+	}
+	ctx.draw(createOrtho2D(screenRect[0],screenRect[2],screenRect[1],screenRect[3],-100,800));
+}
+
+window.requestAnimFrame = 
+	window.requestAnimationFrame ||
+	window.webkitRequestAnimationFrame ||
+	window.mozRequestAnimationFrame ||
+	window.oRequestAnimationFrame ||
+	window.msRequestAnimationFrame ||
+	function(callback) {
+		window.setTimeout(callback,1000/60);
+	};
+
+</script>
+<body onload="start();">
+<h1>This is a simple test app to find a sane to draw a complex scene</h1>
+<div>Please see <a href="http://stackoverflow.com/questions/14315104/optimising-the-drawing-of-overlapping-rectangles">
+http://stackoverflow.com/questions/14315104/optimising-the-drawing-of-overlapping-rectangles</a> for the question with a <b>+500</b> bounty!</div>
+<noscript>
+Sorry, you don't have Javascript enabled :(<br/>
+</noscript>
+<canvas id="game-canvas">
+Sorry, you don't have webGL enabled :(
+</canvas>
+</body>
+</html>
