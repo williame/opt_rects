@@ -12,7 +12,7 @@ html, body { border:0px;margin:0px;padding:0px; color:white; background-color:bl
 <script type="text/javascript" src="ui.js"></script>
 <script type="text/javascript">
 
-var gl, canvas, octree, ctx, colours;
+var gl, canvas, quadtree, ctx, colours;
 
 function sortByZ(a,b) { return a.z-b.z; }
 
@@ -21,11 +21,11 @@ function sortByColour(a,b) { return a.colour-b.colour; }
 var sortFunc = sortByZ; //### can be changed to sortByColour with C key
 
 // call this function to draw all the sprites to the appropriate context
-function draw(visibleRect,octree,ctx) {
+function draw(visibleRect,quadtree,ctx) {
 	var t = now();
 	// get the sprites that are visible
 	var sprites = [];
-	octree.find(visibleRect,sprites);
+	quadtree.find(visibleRect,sprites);
 	sprites.sort(sortFunc);
 	// and draw them
 	ctx.clear();
@@ -73,9 +73,9 @@ function start() {
 		var	w = 128, h = 128,
 			tex = new Uint8Array(w*h*4);
 		for(var j=0; j<tex.length; j++)
-			tex[j] = Math.random()*255;
+			tex[j] = 255;
 		colours.push({
-			rgba: [Math.random(),Math.random(),Math.random(),Math.max(0.3,Math.random())],
+			rgba: [Math.random(),Math.random(),Math.random(),1],
 			tex:  createTexture(w,h,tex),
 		});
 	}
@@ -94,8 +94,8 @@ function start() {
 		});
 	}
 	
-	// for this example, we'll put the sprites into a crude, static octree
-	octree = make_tree(sprites,function(sprite) { return sprite.rect; });
+	// for this example, we'll put the sprites into a crude, static quadtree
+	quadtree = make_tree(sprites,function(sprite) { return sprite.rect; });
 	
 	document.addEventListener("keyup",function(evt) {
 		if(evt.which == 67 || evt.which == 99) // C
@@ -136,7 +136,7 @@ function loop() {
 	var screenRect = [winOfs[0],winOfs[1],winOfs[0]+canvas.width,winOfs[1]+canvas.height];
 	if(!visibleRect || !aabb_contains(visibleRect,screenRect)) {
 		visibleRect = [screenRect[0]-STEPS_PER_DRAW,screenRect[1]-STEPS_PER_DRAW,screenRect[2]+STEPS_PER_DRAW,screenRect[3]+STEPS_PER_DRAW];
-		draw(visibleRect,octree,ctx);
+		draw(visibleRect,quadtree,ctx);
 		drew = 0;
 	}
 	ctx.draw(createOrtho2D(screenRect[0],screenRect[2],screenRect[1],screenRect[3],-100,800));
