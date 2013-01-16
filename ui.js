@@ -190,7 +190,7 @@ UIContext.prototype = {
 	_initShader: function(mvp,program) {
 		gl.useProgram(program);
 		gl.disable(gl.CULL_FACE);
-		gl.disable(gl.DEPTH_TEST);
+		//gl.disable(gl.DEPTH_TEST);
 		gl.uniformMatrix4fv(program.mvp,false,mvp);
 		gl.uniform1i(program.texture,0);
 		gl.uniform1i(program.z,0.6);
@@ -204,7 +204,7 @@ UIContext.prototype = {
 		gl.disableVertexAttribArray(program.texcoord);
 		gl.bindTexture(gl.TEXTURE_2D,null);
 		gl.bindBuffer(gl.ARRAY_BUFFER,null);
-		gl.enable(gl.DEPTH_TEST);
+		//gl.enable(gl.DEPTH_TEST);
 		gl.enable(gl.CULL_FACE);
 		gl.useProgram(null);
 	},

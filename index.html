@@ -32,12 +32,15 @@ function draw(visibleRect,octree,ctx) {
 	for(var sprite in sprites) {
 		sprite = sprites[sprite];
 		var	rect = sprite.rect,
-			colour = colours[sprite.colour],
-			corner = sprite.corner;
-		ctx.fillRoundedRect(colour.rgba,corner,rect[0],rect[1],rect[2],rect[3]);
+			texRect = sprite.texRect,
+			colour = colours[sprite.colour];
+			ctx.drawRect(colour.tex,colour.rgba,
+				rect[0],rect[1],rect[2],rect[3],
+				texRect[0],texRect[1],texRect[2],texRect[3]);
 	}
 	ctx.finish();
-	console.log(""+sortFunc,sprites.length,ctx.buffers.length,t-lastDraw);
+	if(drew)
+		console.log(""+sortFunc.name,sprites.length,ctx.buffers.length,drew,t-lastDraw,1000/((t-lastDraw)/drew));
 	lastDraw = t;
 }
 
@@ -66,38 +69,40 @@ function start() {
 
 	// create the test data
 	colours = [];
-	for(var i=0; i<5; i++) // from a palette of 10 colours
+	for(var i=0; i<5; i++) { // from a palette of 10 colours
+		var	w = 128, h = 128,
+			tex = new Uint8Array(w*h*4);
+		for(var j=0; j<tex.length; j++)
+			tex[j] = Math.random()*255;
 		colours.push({
 			rgba: [Math.random(),Math.random(),Math.random(),Math.max(0.3,Math.random())],
-			tex:  createTexture(1,1,new Uint8Array([255,255,255,255])),
+			tex:  createTexture(w,h,tex),
 		});
+	}
 	var sprites = [];
 	for(var i=0; i<10000; i++) { // we have 10K rectangles
 		var	x = Math.random()*10000,
 			y = Math.random()*10000,
 			w = Math.random()*300+10,
 			h = Math.random()*300+10,
-			colour = Math.floor(Math.random()*colours.length),
-			corner = Math.min(20,Math.max(1,Math.floor(Math.min(w,h)/2)));
+			colour = Math.floor(Math.random()*colours.length);
 		sprites.push({
 			rect: [x,y,x+w,y+h],
 			colour: colour,
+			texRect: [Math.random()*0.5,Math.random()*0.5,Math.random()*0.5+0.5,Math.random()*0.5+0.5],
 			z: i,
-			corner: corner,
 		});
 	}
 	
 	// for this example, we'll put the sprites into a crude, static octree
-	octree = make_tree(sprites,function(sprite) {
-		var rect = sprite.rect, corner = sprite.corner;
-		return [rect[0]-corner,rect[1]-corner,rect[2]+corner,rect[3]+corner];
-	});
+	octree = make_tree(sprites,function(sprite) { return sprite.rect; });
 	
 	document.addEventListener("keyup",function(evt) {
 		if(evt.which == 67 || evt.which == 99) // C
 			sortFunc = sortByColour;
 		else if(evt.which == 90 || evt.which == 122) // Z
 			sortFunc = sortByZ;
+		visibleRect = null;
 	},true);
 
 	// ready to go
@@ -113,8 +118,10 @@ function now() { return (new Date()).getTime(); }
 
 var	winOfs = [500,500],
 	visibleRect,
+	STEPS_PER_DRAW = 100,
+	drew = 0,
 	move = vec2_normalise([Math.max(0.2,Math.random()),Math.max(0.2,Math.random())]),  // 1 pixel per redraw loop
-	lastDraw = now();
+	lastDraw;
 
 function loop() {
 	window.requestAnimFrame(loop);
@@ -128,11 +135,12 @@ function loop() {
 	// has visibility changed? work out what to draw
 	var screenRect = [winOfs[0],winOfs[1],winOfs[0]+canvas.width,winOfs[1]+canvas.height];
 	if(!visibleRect || !aabb_contains(visibleRect,screenRect)) {
-		var FRINGE = 10; // if we add a border to our visibleRect, we don't have to update it every n frames
-		visibleRect = [screenRect[0]-FRINGE,screenRect[1]-FRINGE,screenRect[2]-FRINGE,screenRect[3]-FRINGE];
+		visibleRect = [screenRect[0]-STEPS_PER_DRAW,screenRect[1]-STEPS_PER_DRAW,screenRect[2]+STEPS_PER_DRAW,screenRect[3]+STEPS_PER_DRAW];
 		draw(visibleRect,octree,ctx);
+		drew = 0;
 	}
 	ctx.draw(createOrtho2D(screenRect[0],screenRect[2],screenRect[1],screenRect[3],-100,800));
+	drew++;
 }
 
 window.requestAnimFrame = 
